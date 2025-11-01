@@ -80,7 +80,7 @@ func runChecks(ctx context.Context, path string) error {
 }
 
 func check(ctx context.Context, path string) (bool, error) {
-	success, err := internal.Lint(ctx, path)
+	success, err := internal.LinterTool().Run(ctx, path)
 	if err != nil {
 		return false, fmt.Errorf("lint errors: %w", err)
 	}

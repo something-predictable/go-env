@@ -1,10 +1,11 @@
 version: "2"
 
-# spell-checker: ignore depguard nlreturn staticcheck nolintlint cyclop ints
+# spell-checker: ignore depguard ireturn nlreturn staticcheck nolintlint cyclop ints
 linters:
   default: all
   disable:
     - depguard
+    - ireturn
     - nlreturn
     - wsl
     - wsl_v5
