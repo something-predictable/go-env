@@ -3,6 +3,7 @@ package internal
 // spell-checker: ignore fsnotify
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -18,7 +19,12 @@ func (e WatcherEventError) Error() string {
 	return fmt.Sprintf("error event from filesystem: %s", e.event)
 }
 
-func WatchSource(path string, init func() error, onChange func(path string, removed bool) error) error {
+func WatchSource(
+	ctx context.Context,
+	path string,
+	init func() error,
+	onChange func(path string, removed bool) error,
+) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("error creating watcher: %w", err)
@@ -43,6 +49,8 @@ func WatchSource(path string, init func() error, onChange func(path string, remo
 
 	for {
 		select {
+		case <-ctx.Done():
+			return nil
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return WatcherEventError{event: event}

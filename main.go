@@ -5,28 +5,44 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"riddance/env/internal"
+	"syscall"
 	"time"
 )
 
 func main() {
-	err := run()
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh
+		cancel()
+	}()
+
+	err := run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func run(ctx context.Context) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("error getting working directory: %w", err)
 	}
-	err = internal.WatchSource(cwd,
+	changeCtx, cancel := context.WithCancel(ctx)
+	err = internal.WatchSource(ctx, cwd,
 		func() error {
-			return runChecks(cwd)
+			return runChecks(ctx, cwd)
 		},
 		func(path string, deleted bool) error {
+			cancel()
+			changeCtx, cancel = context.WithCancel(ctx) //nolint:fatcontext
 			rel, err := filepath.Rel(cwd, path)
 			if err != nil {
 				return fmt.Errorf("error getting working directory: %w", err)
@@ -37,7 +53,7 @@ func run() error {
 			} else {
 				fmt.Printf("💾 %s - %s saved\n", now, rel) //nolint:forbidigo
 			}
-			err = runChecks(cwd)
+			err = runChecks(changeCtx, cwd)
 			if err != nil {
 				return fmt.Errorf("error running checks: %w", err)
 			}
@@ -50,8 +66,7 @@ func run() error {
 	return nil
 }
 
-func runChecks(path string) error {
-	ctx := context.Background()
+func runChecks(ctx context.Context, path string) error {
 	success, err := check(ctx, path)
 	if err != nil {
 		return fmt.Errorf("error checking project: %w", err)
