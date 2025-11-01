@@ -1,0 +1,11 @@
+{
+  "If error fmt": {
+    "scope": "go",
+    "prefix": "iferr",
+    "body": [
+      "if err != nil {",
+      "  return fmt.Errorf(\"error $1: %w\", err)",
+      "}",
+    ],
+  }
+}

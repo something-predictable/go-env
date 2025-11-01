@@ -1,0 +1,9 @@
+{
+  "files.exclude": {
+    ".vscode": true,
+    "go.sum": true,
+  },
+  "editor.defaultFormatter": "golang.go",
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false,
+}
