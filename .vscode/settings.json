@@ -2,8 +2,16 @@
   "files.exclude": {
     ".vscode": true,
     "go.sum": true,
+    ".golangci.yaml": true,
   },
   "editor.defaultFormatter": "golang.go",
   "editor.tabSize": 2,
   "editor.detectIndentation": false,
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": [
+    "--path-mode=abs",
+  ],
+  "gopls": {
+    "ui.diagnostic.staticcheck": false,
+  },
 }

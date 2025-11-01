@@ -18,7 +18,7 @@ func (e WatcherEventError) Error() string {
 	return fmt.Sprintf("error event from filesystem: %s", e.event)
 }
 
-func WatchSource(path string, onChange func(path string, removed bool) error) error {
+func WatchSource(path string, init func() error, onChange func(path string, removed bool) error) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("error creating watcher: %w", err)
@@ -34,6 +34,11 @@ func WatchSource(path string, onChange func(path string, removed bool) error) er
 	err = watcher.Add(path)
 	if err != nil {
 		return fmt.Errorf("error adding watcher directory: %w", err)
+	}
+
+	err = init()
+	if err != nil {
+		return fmt.Errorf("error performing initialization before watcher starts: %w", err)
 	}
 
 	for {
