@@ -85,11 +85,15 @@ func runChecks(ctx context.Context, path string) error {
 func check(ctx context.Context, path string) (bool, error) {
 	lintSuccess, err := internal.LinterTool().Run(ctx, path)
 	if err != nil {
-		return false, fmt.Errorf("lint errors: %w", err)
+		return false, fmt.Errorf("linter error: %w", err)
 	}
 	spellSuccess, err := internal.SpellCheckerTool().Run(ctx, path)
 	if err != nil {
 		return false, fmt.Errorf("spell checker error: %w", err)
 	}
-	return lintSuccess && spellSuccess, nil
+	testSuccess, err := internal.TestTool().Run(ctx, path)
+	if err != nil {
+		return false, fmt.Errorf("test error: %w", err)
+	}
+	return lintSuccess && spellSuccess && testSuccess, nil
 }

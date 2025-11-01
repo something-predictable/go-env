@@ -22,7 +22,7 @@ type commandLineTool struct {
 func NewCommandLineTool(command string, checkArgs []string, mainArgs []string) Tool {
 	return &commandLineTool{
 		command:   command,
-		checked:   true,
+		checked:   len(checkArgs) == 0,
 		checkArgs: checkArgs,
 		mainArgs:  mainArgs,
 	}
