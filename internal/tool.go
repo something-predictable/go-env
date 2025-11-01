@@ -41,6 +41,8 @@ func (e commandLineToolError) Unwrap() error {
 	return e.inner
 }
 
+// spell-checker: ignore gosec
+
 func (tool *commandLineTool) Run(ctx context.Context, path string) (bool, error) {
 	err := tool.setup(ctx)
 	if err != nil {

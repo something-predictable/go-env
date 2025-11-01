@@ -3,6 +3,7 @@
     ".vscode": true,
     "go.sum": true,
     ".golangci.yaml": true,
+    "cspell.json": true,
   },
   "editor.defaultFormatter": "golang.go",
   "editor.tabSize": 2,
@@ -14,4 +15,15 @@
   "gopls": {
     "ui.diagnostic.staticcheck": false,
   },
+  "cSpell.customDictionaries": {
+    "project": {
+      "name": "project dictionary",
+      "path": "${workspaceRoot}/dictionary.txt",
+      "description": "Words used in this project",
+      "addWords": true
+    }
+  },
+  "cSpell.words": [
+    "nolint",
+  ],
 }

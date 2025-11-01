@@ -1,0 +1,21 @@
+{
+  "version": "0.2",
+  "files": [
+    "**/*.go",
+    "**/*.md",
+    "go.mod",
+    "example/go.mod"
+  ],
+  "words": [
+    "nolint"
+  ],
+  "dictionaries": [
+    "project"
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "project",
+      "path": "./dictionary.txt"
+    }
+  ]
+}

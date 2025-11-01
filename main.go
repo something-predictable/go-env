@@ -30,6 +30,8 @@ func main() {
 	}
 }
 
+// spell-checker: ignore forbidigo
+
 func run(ctx context.Context) error {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -42,6 +44,7 @@ func run(ctx context.Context) error {
 		},
 		func(path string, deleted bool) error {
 			cancel()
+			// spell-checker: ignore fatcontext
 			changeCtx, cancel = context.WithCancel(ctx) //nolint:fatcontext
 			rel, err := filepath.Rel(cwd, path)
 			if err != nil {
@@ -80,9 +83,13 @@ func runChecks(ctx context.Context, path string) error {
 }
 
 func check(ctx context.Context, path string) (bool, error) {
-	success, err := internal.LinterTool().Run(ctx, path)
+	lintSuccess, err := internal.LinterTool().Run(ctx, path)
 	if err != nil {
 		return false, fmt.Errorf("lint errors: %w", err)
 	}
-	return success, nil
+	spellSuccess, err := internal.SpellCheckerTool().Run(ctx, path)
+	if err != nil {
+		return false, fmt.Errorf("spell checker error: %w", err)
+	}
+	return lintSuccess && spellSuccess, nil
 }
