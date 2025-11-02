@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"riddance/env/internal"
+	"slices"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -76,17 +79,26 @@ func runChecks(ctx context.Context, path string, files []string) error {
 }
 
 func check(ctx context.Context, path string, files []string) (bool, error) {
-	lintSuccess, err := internal.LinterTool().Run(ctx, path, files)
-	if err != nil {
-		return false, fmt.Errorf("linter error: %w", err)
+	tools := []internal.Tool{
+		internal.LinterTool(),
+		internal.SpellCheckerTool(),
+		internal.TestTool(),
 	}
-	spellSuccess, err := internal.SpellCheckerTool().Run(ctx, path, files)
-	if err != nil {
-		return false, fmt.Errorf("spell checker error: %w", err)
+
+	success := make([]bool, len(tools))
+	// spell-checker: ignore errgroup
+	group := errgroup.Group{}
+	for ix, tool := range tools {
+		group.Go(func() error {
+			s, err := tool.Run(ctx, path, files)
+			success[ix] = s
+			return err //nolint:wrapcheck
+		})
 	}
-	testSuccess, err := internal.TestTool().Run(ctx, path, files)
+	err := group.Wait()
 	if err != nil {
-		return false, fmt.Errorf("test error: %w", err)
+		return false, fmt.Errorf("error running checker tool: %w", err)
 	}
-	return lintSuccess && spellSuccess && testSuccess, nil
+
+	return !slices.Contains(success, false), nil
 }
