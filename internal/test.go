@@ -19,5 +19,5 @@ func TestTool() Tool {
 		}
 
 		return nil
-	})
+	}, nil)
 }

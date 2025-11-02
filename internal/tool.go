@@ -1,9 +1,11 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 )
@@ -17,6 +19,7 @@ type commandLineTool struct {
 	checked   bool
 	checkArgs []string
 	mainArgs  func(files []string) []string
+	result    func(stdout string, exitCode int, diagnostics io.Writer) (bool, error)
 }
 
 func Filter(files []string, predicate func(file string) bool) []string {
@@ -29,12 +32,18 @@ func Filter(files []string, predicate func(file string) bool) []string {
 	return passed
 }
 
-func NewCommandLineTool(command string, checkArgs []string, mainArgs func(files []string) []string) Tool {
+func NewCommandLineTool(
+	command string,
+	checkArgs []string,
+	mainArgs func(files []string) []string,
+	result func(stdout string, exitCode int, diagnostics io.Writer) (bool, error),
+) Tool {
 	return &commandLineTool{
 		command:   command,
 		checked:   len(checkArgs) == 0,
 		checkArgs: checkArgs,
 		mainArgs:  mainArgs,
+		result:    result,
 	}
 }
 
@@ -62,19 +71,30 @@ func (tool *commandLineTool) Run(ctx context.Context, path string, files []strin
 	if args == nil {
 		return true, nil
 	}
+	var stdout bytes.Buffer
 	cmd := exec.CommandContext(ctx, tool.command, tool.mainArgs(files)...) //nolint:gosec
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = path
 	err = cmd.Run()
 	if err != nil {
 		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return false, nil
+		if !errors.As(err, &exitError) {
+			return false, commandLineToolError{tool: tool, inner: err}
 		}
-		return false, commandLineToolError{tool: tool, inner: err}
+		if tool.result != nil {
+			return tool.result(stdout.String(), exitError.ExitCode(), os.Stdout)
+		}
+		_, err := fmt.Fprint(os.Stdout, stdout.String())
+		if err != nil {
+			return false, err //nolint:wrapcheck
+		}
+		return false, nil
 	}
 
+	if tool.result != nil {
+		return tool.result(stdout.String(), 0, os.Stdout)
+	}
 	return true, nil
 }
 

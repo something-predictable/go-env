@@ -83,6 +83,7 @@ func check(ctx context.Context, path string, files []string) (bool, error) {
 		internal.LinterTool(),
 		internal.SpellCheckerTool(),
 		internal.TestTool(),
+		internal.FormattingTool(),
 	}
 
 	success := make([]bool, len(tools))
