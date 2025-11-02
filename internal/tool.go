@@ -9,17 +9,27 @@ import (
 )
 
 type Tool interface {
-	Run(ctx context.Context, path string) (bool, error)
+	Run(ctx context.Context, path string, files []string) (bool, error)
 }
 
 type commandLineTool struct {
 	command   string
 	checked   bool
 	checkArgs []string
-	mainArgs  []string
+	mainArgs  func(files []string) []string
 }
 
-func NewCommandLineTool(command string, checkArgs []string, mainArgs []string) Tool {
+func Filter(files []string, predicate func(file string) bool) []string {
+	passed := make([]string, 0, len(files))
+	for _, f := range files {
+		if predicate(f) {
+			passed = append(passed, f)
+		}
+	}
+	return passed
+}
+
+func NewCommandLineTool(command string, checkArgs []string, mainArgs func(files []string) []string) Tool {
 	return &commandLineTool{
 		command:   command,
 		checked:   len(checkArgs) == 0,
@@ -43,12 +53,16 @@ func (e commandLineToolError) Unwrap() error {
 
 // spell-checker: ignore gosec
 
-func (tool *commandLineTool) Run(ctx context.Context, path string) (bool, error) {
+func (tool *commandLineTool) Run(ctx context.Context, path string, files []string) (bool, error) {
 	err := tool.setup(ctx)
 	if err != nil {
 		return false, err
 	}
-	cmd := exec.CommandContext(ctx, tool.command, tool.mainArgs...) //nolint:gosec
+	args := tool.mainArgs(files)
+	if args == nil {
+		return true, nil
+	}
+	cmd := exec.CommandContext(ctx, tool.command, tool.mainArgs(files)...) //nolint:gosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = path

@@ -1,11 +1,10 @@
 package internal
 
-// spell-checker: ignore fsnotify
-
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"path/filepath"
 	"strings"
@@ -24,7 +23,7 @@ func (e WatcherEventError) Error() string {
 func WatchSource(
 	ctx context.Context,
 	path string,
-	init func(ctx context.Context) error,
+	init func(ctx context.Context, paths []string) error,
 	onChange func(ctx context.Context, paths []string, removed bool) error,
 ) error {
 	watcher, err := fsnotify.NewWatcher()
@@ -39,12 +38,13 @@ func WatchSource(
 		}
 	}()
 
-	err = watcher.Add(path)
+	files := make([]string, 0)
+	err = collectRecursively(watcher, &files, path)
 	if err != nil {
-		return fmt.Errorf("error adding watcher directory: %w", err)
+		return fmt.Errorf("error collecting watcher directories: %w", err)
 	}
 
-	err = init(ctx)
+	err = init(ctx, files)
 	if err != nil {
 		return fmt.Errorf("error performing initialization before watcher starts: %w", err)
 	}
@@ -70,15 +70,15 @@ func WatchSource(
 			if !ok {
 				return WatcherEventError{event: event}
 			}
-			if !isSource(event.Name) {
-				continue
-			}
 			// spell-checker: ignore fatcontext
 			changeCtx, changeCancel := context.WithCancel(ctx) //nolint:fatcontext
 			cancel = changeCancel
 			rel, err := filepath.Rel(path, event.Name)
 			if err != nil {
 				return fmt.Errorf("error getting relative path: %w", err)
+			}
+			if !isSource(rel) {
+				continue
 			}
 			queue.addFile(rel)
 			modified := queue.snapshot()
@@ -106,8 +106,41 @@ func WatchSource(
 	}
 }
 
+func collectRecursively(watcher *fsnotify.Watcher, files *[]string, root string) error {
+	walkErr := filepath.WalkDir(root, func(path string, entry fs.DirEntry, statErr error) error {
+		if statErr != nil {
+			return fmt.Errorf("error adding stating directory entry: %w", statErr)
+		}
+		if strings.Contains(path, "/.") {
+			return nil
+		}
+		if entry.IsDir() {
+			err := watcher.Add(path)
+			if err != nil {
+				return fmt.Errorf("error adding watcher directory: %w", err)
+			}
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return fmt.Errorf("error getting relative path: %w", err)
+		}
+		if isSource(rel) {
+			*files = append(*files, rel)
+		}
+		return nil
+	})
+	if walkErr != nil {
+		return fmt.Errorf("error adding watcher directory: %w", walkErr)
+	}
+	return nil
+}
+
 func isSource(name string) bool {
-	return strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "go.mod")
+	return strings.HasSuffix(name, ".go") ||
+		name == "go.mod" ||
+		name == "dictionary.txt" ||
+		strings.HasPrefix(name, "testdata/")
 }
 
 type fileQueue struct {

@@ -37,19 +37,19 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("error getting working directory: %w", err)
 	}
 	err = internal.WatchSource(ctx, cwd,
-		func(ctx context.Context) error {
-			return runChecks(ctx, cwd)
+		func(ctx context.Context, files []string) error {
+			return runChecks(ctx, cwd, files)
 		},
-		func(ctx context.Context, paths []string, deleted bool) error {
+		func(ctx context.Context, files []string, deleted bool) error {
 			now := time.Now().Format(time.TimeOnly)
-			for _, path := range paths {
+			for _, path := range files {
 				if deleted {
 					fmt.Printf("🗑️ %s - %s deleted\n", now, path) //nolint:forbidigo
 				} else {
 					fmt.Printf("💾 %s - %s saved\n", now, path) //nolint:forbidigo
 				}
 			}
-			err := runChecks(ctx, cwd)
+			err := runChecks(ctx, cwd, files)
 			if err != nil {
 				return fmt.Errorf("error running checks: %w", err)
 			}
@@ -62,8 +62,8 @@ func run(ctx context.Context) error {
 	return nil
 }
 
-func runChecks(ctx context.Context, path string) error {
-	success, err := check(ctx, path)
+func runChecks(ctx context.Context, path string, files []string) error {
+	success, err := check(ctx, path, files)
 	if err != nil {
 		return fmt.Errorf("error checking project: %w", err)
 	}
@@ -75,16 +75,16 @@ func runChecks(ctx context.Context, path string) error {
 	return nil
 }
 
-func check(ctx context.Context, path string) (bool, error) {
-	lintSuccess, err := internal.LinterTool().Run(ctx, path)
+func check(ctx context.Context, path string, files []string) (bool, error) {
+	lintSuccess, err := internal.LinterTool().Run(ctx, path, files)
 	if err != nil {
 		return false, fmt.Errorf("linter error: %w", err)
 	}
-	spellSuccess, err := internal.SpellCheckerTool().Run(ctx, path)
+	spellSuccess, err := internal.SpellCheckerTool().Run(ctx, path, files)
 	if err != nil {
 		return false, fmt.Errorf("spell checker error: %w", err)
 	}
-	testSuccess, err := internal.TestTool().Run(ctx, path)
+	testSuccess, err := internal.TestTool().Run(ctx, path, files)
 	if err != nil {
 		return false, fmt.Errorf("test error: %w", err)
 	}

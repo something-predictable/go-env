@@ -18,20 +18,26 @@ func TestNoChange(t *testing.T) {
 	t.Parallel()
 	harness(t, func(_ string) error {
 		return nil
-	}, func(events []event) {
+	}, func(_ string) error {
+		return nil
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{})
 		assertEvents(t, events, []event{})
 	})
 }
 
 func TestSingleFileCreate(t *testing.T) {
 	t.Parallel()
-	harness(t, func(dir string) error {
+	harness(t, func(_ string) error {
+		return nil
+	}, func(dir string) error {
 		err := writeFile(dir, "goat.go")
 		if err != nil {
 			return err
 		}
 		return nil
-	}, func(events []event) {
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{})
 		assertEvents(t, events, []event{
 			{paths: []string{"goat.go"}, removed: false},
 		})
@@ -40,7 +46,9 @@ func TestSingleFileCreate(t *testing.T) {
 
 func TestMultiFileCreate(t *testing.T) {
 	t.Parallel()
-	harness(t, func(dir string) error {
+	harness(t, func(_ string) error {
+		return nil
+	}, func(dir string) error {
 		err := writeFile(dir, "goat1.go")
 		if err != nil {
 			return err
@@ -54,7 +62,8 @@ func TestMultiFileCreate(t *testing.T) {
 			return err
 		}
 		return err
-	}, func(events []event) {
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{})
 		assertEvents(t, events, []event{
 			{paths: []string{"goat1.go", "goat2.go"}, removed: false},
 		})
@@ -63,7 +72,9 @@ func TestMultiFileCreate(t *testing.T) {
 
 func TestQuickMultiFileCreate(t *testing.T) {
 	t.Parallel()
-	harness(t, func(dir string) error {
+	harness(t, func(_ string) error {
+		return nil
+	}, func(dir string) error {
 		group := errgroup.Group{}
 		group.Go(func() error {
 			return writeFile(dir, "goat1.go")
@@ -75,7 +86,8 @@ func TestQuickMultiFileCreate(t *testing.T) {
 			return writeFile(dir, "goat1.go")
 		})
 		return group.Wait()
-	}, func(events []event) {
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{})
 		assertEvents(t, events, []event{
 			{paths: []string{"goat1.go", "goat2.go"}, removed: false},
 		})
@@ -84,7 +96,9 @@ func TestQuickMultiFileCreate(t *testing.T) {
 
 func TestSingleFileDelete(t *testing.T) {
 	t.Parallel()
-	harness(t, func(dir string) error {
+	harness(t, func(_ string) error {
+		return nil
+	}, func(dir string) error {
 		err := writeFile(dir, "goat.go")
 		if err != nil {
 			return err
@@ -95,9 +109,32 @@ func TestSingleFileDelete(t *testing.T) {
 			return err
 		}
 		return nil
-	}, func(events []event) {
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{})
 		assertEvents(t, events, []event{
 			{paths: []string{"goat.go"}, removed: false},
+			{paths: []string{"goat.go"}, removed: true},
+		})
+	})
+}
+
+func TestInitialFileDelete(t *testing.T) {
+	t.Parallel()
+	harness(t, func(dir string) error {
+		err := writeFile(dir, "goat.go")
+		if err != nil {
+			return err
+		}
+		return nil
+	}, func(dir string) error {
+		err := os.Remove(path.Join(dir, "goat.go"))
+		if err != nil {
+			return err
+		}
+		return nil
+	}, func(initial []string, events []event) {
+		assertInitial(t, initial, []string{"goat.go"})
+		assertEvents(t, events, []event{
 			{paths: []string{"goat.go"}, removed: true},
 		})
 	})
@@ -122,6 +159,13 @@ func eventCompare(one event, other event) int {
 	)
 }
 
+func assertInitial(t *testing.T, actual []string, expected []string) {
+	t.Helper()
+	if slices.Compare(actual, expected) != 0 {
+		t.Errorf("Unexpected initial:\n  got %v\n  expected %v", actual, expected)
+	}
+}
+
 func assertEvents(t *testing.T, actual []event, expected []event) {
 	t.Helper()
 	if slices.CompareFunc(actual, expected, eventCompare) != 0 {
@@ -129,9 +173,17 @@ func assertEvents(t *testing.T, actual []event, expected []event) {
 	}
 }
 
-func harness(t *testing.T, actions func(dir string) error, assert func(events []event)) {
+func harness(t *testing.T,
+	initialization func(dir string) error,
+	actions func(dir string) error,
+	assert func(initialPaths []string, events []event),
+) {
 	t.Helper()
 	dir := t.TempDir()
+	err := initialization(dir)
+	if err != nil {
+		t.Fatalf("Initialization failed: %v", err)
+	}
 
 	const eventQueueSize = 4
 	removedFiles := make(chan []string, eventQueueSize)
@@ -145,9 +197,11 @@ func harness(t *testing.T, actions func(dir string) error, assert func(events []
 	initialized := make(chan struct{}, 1)
 	defer close(initialized)
 
+	var initialPaths []string
 	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
-		err := internal.WatchSource(ctx, dir, func(_ context.Context) error {
+		err := internal.WatchSource(ctx, dir, func(_ context.Context, paths []string) error {
+			initialPaths = paths
 			initialized <- struct{}{}
 			return nil
 		}, func(ctx context.Context, paths []string, removed bool) error {
@@ -199,7 +253,7 @@ loop:
 		}
 	}
 
-	assert(events)
+	assert(initialPaths, events)
 }
 
 func delay(ctx context.Context, d time.Duration) error {
