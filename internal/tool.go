@@ -70,6 +70,9 @@ func (tool *commandLineTool) setup(ctx context.Context) error {
 	}
 	cmd := exec.CommandContext(ctx, tool.command, tool.checkArgs...) //nolint:gosec
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		return ctx.Err() //nolint:wrapcheck
+	}
 	if err != nil {
 		return commandLineToolError{tool: tool, inner: err}
 	}

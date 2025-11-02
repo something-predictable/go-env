@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"riddance/env/internal"
 	"syscall"
 	"time"
@@ -37,26 +36,20 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error getting working directory: %w", err)
 	}
-	changeCtx, cancel := context.WithCancel(ctx)
 	err = internal.WatchSource(ctx, cwd,
-		func() error {
+		func(ctx context.Context) error {
 			return runChecks(ctx, cwd)
 		},
-		func(path string, deleted bool) error {
-			cancel()
-			// spell-checker: ignore fatcontext
-			changeCtx, cancel = context.WithCancel(ctx) //nolint:fatcontext
-			rel, err := filepath.Rel(cwd, path)
-			if err != nil {
-				return fmt.Errorf("error getting working directory: %w", err)
-			}
+		func(ctx context.Context, paths []string, deleted bool) error {
 			now := time.Now().Format(time.TimeOnly)
-			if deleted {
-				fmt.Printf("🗑️ %s - %s deleted\n", now, rel) //nolint:forbidigo
-			} else {
-				fmt.Printf("💾 %s - %s saved\n", now, rel) //nolint:forbidigo
+			for _, path := range paths {
+				if deleted {
+					fmt.Printf("🗑️ %s - %s deleted\n", now, path) //nolint:forbidigo
+				} else {
+					fmt.Printf("💾 %s - %s saved\n", now, path) //nolint:forbidigo
+				}
 			}
-			err = runChecks(changeCtx, cwd)
+			err := runChecks(ctx, cwd)
 			if err != nil {
 				return fmt.Errorf("error running checks: %w", err)
 			}
