@@ -7,6 +7,7 @@ linters:
     - depguard
     - ireturn
     - nlreturn
+    - varnamelen
     - wsl
     - wsl_v5
   exclusions:
@@ -29,6 +30,9 @@ linters:
       allow-unused: true
       require-explanation: false
       require-specific: true
+    gocritic:
+      disabled-checks:
+        - singleCaseSwitch
     revive:
       enable-all-rules: true
       rules:
@@ -36,11 +40,18 @@ linters:
           disabled: true
         - name: exported
           disabled: true
-        - name: line-length-limit
+        - name: import-alias-naming
+          arguments:
+            - "^[a-z][a-z0-9_]{0,}$"
+        - name: nested-structs
           disabled: true
         - name: add-constant
           arguments:
             - allowInts: '0,1,0600,0644'
+        - name: argument-limit
+          disabled: true
+        - name: line-length-limit
+          disabled: true
         - name: cyclomatic
           arguments:
             - 30
